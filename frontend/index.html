@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instant Share</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        body { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); min-height: 100vh; }
+    </style>
+</head>
+<body class="p-6 md:p-12 font-sans text-gray-800">
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10 text-white">
+            <h1 class="text-5xl font-extrabold tracking-tight mb-2">Instant Share</h1>
+            <p class="text-lg opacity-90">Quickly transfer snippets and files between devices.</p>
+        </header>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <section class="glass p-8 rounded-3xl shadow-2xl">
+                <h2 class="text-2xl font-bold mb-6 text-indigo-700 flex items-center gap-2">
+                    <span>📤</span> Send
+                </h2>
+                <textarea id="textContent" class="w-full p-4 border-2 border-gray-100 rounded-xl mb-4 h-40 focus:border-indigo-500 outline-none transition" placeholder="Paste text or code here..."></textarea>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-500 mb-2">Attach Image or File</label>
+                    <input type="file" id="fileInput" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                </div>
+
+                <button onclick="sendData()" id="sendBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200">
+                    Generate Share Code
+                </button>
+
+                <div id="resultArea" class="mt-8 hidden animate-bounce-in p-6 bg-green-50 border-2 border-green-200 rounded-2xl text-center">
+                    <p class="text-sm text-green-700 font-bold mb-1">YOUR CODE:</p>
+                    <div class="flex items-center justify-center gap-3">
+                        <span id="generatedCode" class="text-4xl font-mono font-black tracking-widest text-indigo-900"></span>
+                        <button onclick="copyCode()" class="bg-white p-2 rounded-lg shadow-sm hover:bg-gray-50">📋</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-3 italic">Expires in 10 minutes</p>
+                </div>
+            </section>
+
+            <section class="glass p-8 rounded-3xl shadow-2xl">
+                <h2 class="text-2xl font-bold mb-6 text-gray-700 flex items-center gap-2">
+                    <span>📥</span> Retrieve
+                </h2>
+                <input type="text" id="retrieveCode" maxlength="6" class="w-full p-5 border-2 border-gray-100 rounded-xl mb-4 text-center text-3xl font-mono uppercase tracking-[0.5em] focus:border-gray-400 outline-none transition" placeholder="------">
+                
+                <button onclick="retrieveData()" id="retrieveBtn" class="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-black active:scale-95 transition-all shadow-lg shadow-gray-300">
+                    Fetch Data
+                </button>
+
+                <div id="displayArea" class="mt-8 hidden space-y-6">
+                    <div id="retrievedTextContainer" class="hidden">
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Text Content</label>
+                        <pre id="retrievedText" class="mt-2 p-4 bg-gray-50 border border-gray-200 rounded-xl overflow-x-auto text-sm font-mono"></pre>
+                    </div>
+
+                    <div id="retrievedFileContainer" class="hidden">
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Attached File</label>
+                        <div id="imagePreview" class="mt-2 mb-4 hidden">
+                            <img src="" class="max-h-64 w-full object-contain rounded-xl shadow-md border border-gray-100">
+                        </div>
+                        <a id="downloadBtn" class="flex items-center justify-center gap-2 w-full bg-blue-500 text-white p-4 rounded-xl font-bold hover:bg-blue-600 transition">
+                            <span>💾</span> Download <span id="fileNameLabel"></span>
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // CHANGE THIS TO YOUR RENDER URL AFTER DEPLOYING BACKEND
+        const API_URL = "http://127.0.0.1:8000"; 
+
+        async function sendData() {
+            const text = document.getElementById('textContent').value;
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const btn = document.getElementById('sendBtn');
+
+            if (!text && !file) return alert("Enter text or select a file!");
+
+            btn.disabled = true;
+            btn.innerText = "Uploading...";
+
+            const formData = new FormData();
+            if(text) formData.append('text', text);
+            if(file) formData.append('file', file);
+
+            try {
+                const response = await fetch(`${API_URL}/send`, { method: 'POST', body: formData });
+                if(!response.ok) throw new Error("Upload failed");
+                const data = await response.json();
+                
+                document.getElementById('generatedCode').innerText = data.code;
+                document.getElementById('resultArea').classList.remove('hidden');
+            } catch (err) {
+                alert("Error connecting to server.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Generate Share Code";
+            }
+        }
+
+        async function retrieveData() {
+            const code = document.getElementById('retrieveCode').value.trim().toUpperCase();
+            const btn = document.getElementById('retrieveBtn');
+            if (!code) return;
+
+            // Reset UI
+            document.getElementById('displayArea').classList.add('hidden');
+            document.getElementById('retrievedTextContainer').classList.add('hidden');
+            document.getElementById('retrievedFileContainer').classList.add('hidden');
+            document.getElementById('imagePreview').classList.add('hidden');
+
+            btn.disabled = true;
+            btn.innerText = "Searching...";
+
+            try {
+                const response = await fetch(`${API_URL}/retrieve/${code}`);
+                if (!response.ok) throw new Error("Code expired or invalid");
+                const data = await response.json();
+
+                document.getElementById('displayArea').classList.remove('hidden');
+                
+                if (data.text) {
+                    document.getElementById('retrievedTextContainer').classList.remove('hidden');
+                    document.getElementById('retrievedText').innerText = data.text;
+                }
+
+                if (data.file) {
+                    document.getElementById('retrievedFileContainer').classList.remove('hidden');
+                    document.getElementById('fileNameLabel').innerText = `(${data.filename})`;
+                    
+                    // Convert Base64 back to a file for download
+                    const byteCharacters = atob(data.file);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray]);
+                    const url = URL.createObjectURL(blob);
+
+                    const dl = document.getElementById('downloadBtn');
+                    dl.href = url;
+                    dl.download = data.filename;
+
+                    // Image Preview
+                    if (data.filename.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                        const img = document.querySelector('#imagePreview img');
+                        img.src = url;
+                        document.getElementById('imagePreview').classList.remove('hidden');
+                    }
+                }
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Fetch Data";
+            }
+        }
+
+        function copyCode() {
+            const code = document.getElementById('generatedCode').innerText;
+            navigator.clipboard.writeText(code);
+            alert("Code copied to clipboard!");
+        }
+    </script>
+</body>
+</html>
